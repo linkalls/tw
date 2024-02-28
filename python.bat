@@ -1,4 +1,5 @@
 @echo off
+chcp 65001
 SET PYTHON_INSTALLER=python-3.12.0-amd64.exe
 SET DOWNLOAD_URL=https://www.python.org/ftp/python/3.12.0/%PYTHON_INSTALLER%
 
