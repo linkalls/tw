@@ -11,9 +11,19 @@ import time
 import threading
 import json
 import atexit
-
+import chromedriver_binary_sync  # 追加
 
 # ChromeDriverのパスを指定
+# chrome_driver_path = os.path.join('driver', 'chromedriver.exe')  # コメントアウト
+
+# 'driver'ディレクトリが存在しない場合は作成
+if not os.path.exists('driver'):
+    os.makedirs('driver')
+
+# chromedriver-binary-syncを使用してChromeDriverをダウンロード
+chromedriver_binary_sync.download(download_dir='driver')
+
+# ChromeDriverのパスを取得
 chrome_driver_path = os.path.join('driver', 'chromedriver.exe')
 
 # 設定ファイルのパス
