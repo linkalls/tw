@@ -11,7 +11,7 @@ if %errorlevel% neq 0 (
 
 :: pipを使用してパッケージをインストール
 python -m pip install --upgrade pip
-python -m pip install PySimpleGUI requests selenium
+python -m pip install PySimpleGUI requests selenium chromedriver-binary-sync
 
 echo パッケージのインストールが完了しました。
 pause
