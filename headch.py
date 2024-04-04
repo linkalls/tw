@@ -54,7 +54,7 @@ def create_driver():
 def load_config():
   default_config = {
     'urls_filename': 'image_urls.txt',
-    'save_folder': os.getcwd(),  # 画像を保存するデフォルトフォルダ
+    'save_folder': os.path.join(os.getcwd(), 'img'),  # 画像を保存するデフォルトフォルダを'img'に変更
   }
   if os.path.exists(config_file):
     with open(config_file, 'r') as file:
@@ -90,7 +90,6 @@ def collect_image_urls(urls_filename, window):
   driver = create_driver()  # 既に起動しているChromeブラウザを操作するwebdriverを作成
 
   # ブックマークページに移動
-
   driver.get('https://twitter.com/i/bookmarks')
   window.write_event_value('-THREAD-', 'ブックマークページに移動しています...')
   time.sleep(4)  # ページの読み込みを待つ
@@ -99,13 +98,14 @@ def collect_image_urls(urls_filename, window):
   scroll_retry_count = 0
   scroll_retry_limit = 2  # スクロールの再試行回数の上限
 
-   # 既存のURLを読み込む
+  # 既存のURLを読み込む
   existing_urls = set()
   if os.path.exists(urls_filename):
     with open(urls_filename, 'r') as file:
       existing_urls = set(line.strip() for line in file)
 
   saved_urls = set()
+  images = []  # 画像要素のリストを初期化
   try:
     while True:
       # スクロール前の位置を取得
@@ -115,6 +115,14 @@ def collect_image_urls(urls_filename, window):
       window.write_event_value('-THREAD-', 'ページをスクロールしています...')
       time.sleep(0.01)  # 0.01秒待機してゆっくりスクロール
       take_screenshot(driver, 'scrolling_screenshot.png') # スクリーンショットを取得
+
+      try:
+          display_button = driver.find_element(By.CSS_SELECTOR, 'span.css-1qaijid.r-bcqeeo.r-qvutc0.r-1tl8opc[style="text-overflow: unset;"]')
+          # display_button.click() の代わりに以下のコードを使用
+          driver.execute_script("arguments[0].click();", display_button)
+          window.write_event_value('-THREAD-', '表示ボタンをクリックしました。')
+      except NoSuchElementException:
+          pass
 
       # スクロール後の位置を取得
       new_position = driver.execute_script("return window.pageYOffset;")
@@ -133,8 +141,12 @@ def collect_image_urls(urls_filename, window):
         # 位置が変わっている場合
         scroll_retry_count = 0  # 再試行カウンターをリセット
 
-      # 画像要素を取得
-      images = driver.find_elements(By.CSS_SELECTOR, 'img.css-9pa8cd')
+      # 新しくスクロールされた部分の画像要素を取得
+      new_images = driver.find_elements(By.CSS_SELECTOR, 'img.css-9pa8cd')
+      new_images = new_images[len(images):]  # 既に処理した要素を除外
+      images = new_images  # 画像要素のリストを更新
+
+      # 画像要素を処理
       for image in images:
         try:
           image_url = image.get_attribute('src')
@@ -156,6 +168,10 @@ def collect_image_urls(urls_filename, window):
                 elif value == '240x240':
                   new_query_params.append(key + '=orig')
                 elif value == 'large':
+                  new_query_params.append(key + '=orig')
+                elif value == '120x120':
+                  new_query_params.append(key + '=orig')
+                elif value == '600x600':
                   new_query_params.append(key + '=orig')
                 else:
                   new_query_params.append(param)
@@ -193,6 +209,10 @@ def download_images(image_urls, directory=None, window=None):
     os.makedirs(directory)
 
   downloaded_urls = set()  # ダウンロード済みのURLを追跡するためのセット
+
+  # txtファイルの行数に基づいて、先頭の0の数を調整
+  num_digits = len(str(len(image_urls)))
+
   for index, url in enumerate(image_urls, start=1):  # 連番は1から始める
     if url in downloaded_urls:
       if window:
@@ -207,7 +227,8 @@ def download_images(image_urls, directory=None, window=None):
       format = url.split('format=')[1].split('&')[0]
 
     # 正しい拡張子でファイル名を生成
-    filename = f'{index}.{format}'
+    filename = f'{str(index).zfill(num_digits)}.{format}'
+
 
     try:
       response = requests.get(url, stream=True)
@@ -269,13 +290,15 @@ def main():
         elif event == '-BATCH-':
           collect_thread = threading.Thread(target=collect_image_urls, args=(values['-URLS_FILENAME-'], window), daemon=True)
           collect_thread.start()
-        elif event == '-COLLECT_DONE-':  # collect_image_urls 関数が完了したときの処理
-          if os.path.exists(values['-URLS_FILENAME-']):
-            with open(values['-URLS_FILENAME-'], 'r') as file:
-              image_urls = [line.strip() for line in file]
-            threading.Thread(target=download_images, args=(image_urls, values['-SAVE_FOLDER-'], window), daemon=True).start()
-          else:
-            print(f"ファイルが存在しません: {values['-URLS_FILENAME-']}")
+
+        # '-COLLECT_DONE-'イベントの処理をコメントアウト
+        # elif event == '-COLLECT_DONE-':  # collect_image_urls 関数が完了したときの処理
+        #   if os.path.exists(values['-URLS_FILENAME-']):
+        #     with open(values['-URLS_FILENAME-'], 'r') as file:
+        #       image_urls = [line.strip() for line in file]
+        #     threading.Thread(target=download_images, args=(image_urls, values['-SAVE_FOLDER-'], window), daemon=True).start()
+        #   else:
+        #     print(f"ファイルが存在しません: {values['-URLS_FILENAME-']}")
         elif event == '-SAVE-':
               config['urls_filename'] = values['-URLS_FILENAME-']
               config['save_folder'] = values['-SAVE_FOLDER-']
